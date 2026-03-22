@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#050507" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Adi OS" />
+  <meta name="description" content="Personal productivity system for solo content creators" />
+
+  <title>Adi OS</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Apple touch icons -->
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #050507; color: #e8e8f0; }
+    #root { height: 100%; }
+
+    /* Safe area for notch phones */
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    /* Splash screen */
+    #splash {
+      position: fixed; inset: 0; background: #050507;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 9999; transition: opacity 0.5s ease;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    .splash-icon { font-size: 64px; margin-bottom: 16px; animation: pulse 1.5s infinite; }
+    .splash-title {
+      font-family: 'Barlow', sans-serif; font-size: 36px; font-weight: 900; letter-spacing: 4px;
+      background: linear-gradient(135deg, #a855f7, #39ff14);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .splash-sub { font-family: 'Rajdhani', sans-serif; font-size: 13px; letter-spacing: 3px; color: #555; margin-top: 8px; }
+    .splash-bar { width: 160px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 99px; margin-top: 32px; overflow: hidden; }
+    .splash-fill { height: 100%; background: linear-gradient(90deg, #a855f7, #39ff14); border-radius: 99px; animation: load 1.5s ease forwards; }
+    @keyframes load { from { width: 0 } to { width: 100% } }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.3); border-radius: 99px; }
+
+    /* Global nav/button hover */
+    .nav-item:hover { color: #a855f7 !important; background: rgba(168,85,247,0.08) !important; }
+    .glow-btn:hover { transform: translateY(-1px); filter: brightness(1.2); }
+    .pipeline-card:hover { border-color: rgba(168,85,247,0.3) !important; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(168,85,247,0.15); transition: all 0.2s; }
+    .habit-card:hover, .habit-big:hover { transform: scale(1.02); }
+    .idea-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(168,85,247,0.12); transition: all 0.25s; }
+    .task-item:hover { border-color: rgba(168,85,247,0.2) !important; }
+    select option { background: #0a0a12; color: #e8e8f0; }
+
+    /* Mobile bottom nav */
+    @media (max-width: 768px) {
+      #mobile-nav { display: flex !important; }
+      #desktop-sidebar { display: none !important; }
+      #main-content { padding-bottom: 80px !important; }
+    }
+    @media (min-width: 769px) {
+      #mobile-nav { display: none !important; }
+    }
+    #mobile-nav {
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(8,8,14,0.97);
+      border-top: 1px solid rgba(168,85,247,0.15);
+      padding: 8px 4px;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      justify-content: space-around;
+    }
+    .mob-nav-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      background: none; border: none; cursor: pointer;
+      padding: 6px 8px; border-radius: 10px;
+      transition: all 0.2s; min-width: 44px;
+      font-family: 'Rajdhani', sans-serif;
+    }
+    .mob-nav-btn.active { background: rgba(168,85,247,0.15); }
+    .mob-nav-btn span:first-child { font-size: 20px; }
+    .mob-nav-btn span:last-child { font-size: 9px; letter-spacing: 0.5px; font-weight: 700; }
+
+    /* Install banner */
+    #install-banner {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(10,10,20,0.97); border: 1px solid rgba(168,85,247,0.4);
+      border-radius: 14px; padding: 12px 20px;
+      display: flex; align-items: center; gap: 12px;
+      z-index: 500; font-family: 'Rajdhani', sans-serif;
+      box-shadow: 0 8px 32px rgba(168,85,247,0.2);
+      max-width: 340px; width: 90%;
+      animation: slideDown 0.4s ease;
+    }
+    @keyframes slideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+    #install-banner.hide { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Splash Screen -->
+<div id="splash">
+  <div class="splash-icon">⚔️</div>
+  <div class="splash-title">ADI OS</div>
+  <div class="splash-sub">CREATOR COMMAND CENTER</div>
+  <div class="splash-bar"><div class="splash-fill"></div></div>
+</div>
+
+<!-- Install Banner (Android Chrome) -->
+<div id="install-banner" class="hide">
+  <span style="font-size:28px">📲</span>
+  <div style="flex:1">
+    <div style="font-weight:800;font-size:14px;color:#e8e8f0">Install Adi OS</div>
+    <div style="font-size:12px;color:#888">Add to your home screen</div>
+  </div>
+  <button id="install-btn" style="background:linear-gradient(135deg,#a855f7,#7c3aed);border:none;border-radius:8px;padding:8px 14px;color:white;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px">Install</button>
+  <button onclick="document.getElementById('install-banner').classList.add('hide')" style="background:none;border:none;color:#555;cursor:pointer;font-size:18px;padding:0 4px">✕</button>
+</div>
+
+<!-- App Root -->
+<div id="root"></div>
+
+<!-- Mobile Bottom Nav -->
+<nav id="mobile-nav"></nav>
+
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const MOTIVATIONS = [
+  "Stay consistent. You're building a system.",
+  "Discipline > Motivation. Always.",
+  "One video at a time. One reel at a time.",
+  "The algorithm rewards the relentless.",
+  "You don't need to feel ready. Start anyway.",
+  "Build in public. Win in silence.",
+  "Your future self is watching. Don't disappoint.",
+  "Consistency compounds. Show up today.",
+];
+
+const STAGES = ["Idea", "Script", "Visuals", "Editing", "Ready", "Posted"];
+const PLATFORMS = ["YouTube", "Instagram"];
+const TASK_CATEGORIES = ["Deep Work", "Editing", "Learning", "Planning"];
+const PRIORITY_LEVELS = ["High", "Medium", "Low"];
+
+const HABITS = [
+  { id: "work6h", label: "6h Content Work", icon: "⚡" },
+  { id: "learn1h", label: "1h Learning", icon: "🧠" },
+  { id: "noDistract", label: "No Distractions", icon: "🛡️" },
+  { id: "dailyUpload", label: "Daily Upload", icon: "🚀" },
+];
+
+const STAGE_COLORS = { Idea:"#a855f7", Script:"#3b82f6", Visuals:"#f59e0b", Editing:"#ef4444", Ready:"#22c55e", Posted:"#10b981" };
+const PLATFORM_COLORS = { YouTube:"#ff4444", Instagram:"#39ff14" };
+
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+const defaultContent = [
+  { id:"c1", title:"YouTube Growth Strategy 2025", platform:"YouTube", stage:"Script", timeRequired:"10h", deadline:"2026-03-28", progress:40, notes:"Hook: How I grew 0-10k subscribers", priority:"High" },
+  { id:"c2", title:"Instagram Reel - Morning Routine", platform:"Instagram", stage:"Editing", timeRequired:"3.5h", deadline:"2026-03-23", progress:70, notes:"Fast cuts, trending audio", priority:"High" },
+  { id:"c3", title:"Behind the Scenes - Setup Tour", platform:"YouTube", stage:"Idea", timeRequired:"8h", deadline:"2026-04-01", progress:5, notes:"Show desk, gear, workflow", priority:"Medium" },
+  { id:"c4", title:"30-Day Content Challenge", platform:"Instagram", stage:"Ready", timeRequired:"2h", deadline:"2026-03-24", progress:95, notes:"Scheduled for tomorrow", priority:"High" },
+];
+const defaultTasks = [
+  { id:"t1", title:"Write script for YouTube video", category:"Deep Work", priority:"High", done:false, date:new Date().toISOString().split("T")[0] },
+  { id:"t2", title:"Edit Instagram reel #4", category:"Editing", priority:"High", done:false, date:new Date().toISOString().split("T")[0] },
+  { id:"t3", title:"Study thumbnail design", category:"Learning", priority:"Medium", done:false, date:new Date().toISOString().split("T")[0] },
+];
+const defaultIdeas = [
+  { id:"i1", title:"Content Creator Burnout - Real Talk", platform:"YouTube", hook:"What nobody tells you about being consistent for 1 year", viral:5 },
+  { id:"i2", title:"My Exact Content Schedule", platform:"Instagram", hook:"How I post 6x/week without burning out", viral:4 },
+];
+const defaultAnalytics = [
+  { id:"a1", title:"YouTube Growth Hacks", platform:"YouTube", views:12400, likes:843, comments:127, retention:"62%", notes:"Strong hook, weak CTA" },
+  { id:"a2", title:"Morning Routine Reel", platform:"Instagram", views:34200, likes:2100, comments:89, retention:"78%", notes:"Audio trend boosted reach" },
+];
+
+// ─── STYLES ───────────────────────────────────────────────────────────────────
+const S = {
+  app: { minHeight:"100vh", background:"#050507", color:"#e8e8f0", fontFamily:"'Barlow','Rajdhani',sans-serif", display:"flex", flexDirection:"column", position:"relative" },
+  bgGlow: { position:"fixed", inset:0, pointerEvents:"none", zIndex:0, background:"radial-gradient(ellipse 60% 40% at 20% 10%, rgba(168,85,247,0.08) 0%, transparent 60%), radial-gradient(ellipse 50% 30% at 80% 90%, rgba(57,255,20,0.06) 0%, transparent 60%)" },
+  layout: { display:"flex", flex:1, position:"relative", zIndex:1 },
+  sidebar: { width:220, minHeight:"100vh", background:"rgba(10,10,15,0.95)", borderRight:"1px solid rgba(168,85,247,0.15)", display:"flex", flexDirection:"column", backdropFilter:"blur(20px)", position:"sticky", top:0, height:"100vh", overflow:"hidden" },
+  main: { flex:1, padding:"20px", overflow:"auto" },
+  card: { background:"rgba(15,15,22,0.9)", border:"1px solid rgba(168,85,247,0.12)", borderRadius:16, padding:18, backdropFilter:"blur(10px)" },
+  neonText: (c="#a855f7") => ({ color:c, textShadow:`0 0 20px ${c}55` }),
+  glowBtn: (c="#a855f7") => ({ background:`linear-gradient(135deg,${c}22,${c}11)`, border:`1px solid ${c}44`, borderRadius:10, padding:"10px 16px", color:c, fontWeight:700, cursor:"pointer", fontSize:13, letterSpacing:0.5, transition:"all 0.2s", fontFamily:"inherit" }),
+  pBar: { height:6, background:"rgba(255,255,255,0.06)", borderRadius:99, overflow:"hidden" },
+  pFill: (p, c="#a855f7") => ({ height:"100%", width:`${p}%`, background:`linear-gradient(90deg,${c},${c}aa)`, borderRadius:99, boxShadow:`0 0 10px ${c}88`, transition:"width 0.6s ease" }),
+  tag: (c) => ({ display:"inline-block", padding:"2px 10px", borderRadius:99, fontSize:11, fontWeight:700, letterSpacing:0.5, background:`${c}22`, color:c, border:`1px solid ${c}44` }),
+  input: { background:"rgba(255,255,255,0.04)", border:"1px solid rgba(168,85,247,0.2)", borderRadius:8, padding:"10px 14px", color:"#e8e8f0", fontFamily:"inherit", fontSize:14, width:"100%", outline:"none" },
+  modalOverlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(8px)", padding:16 },
+  modalBox: { background:"#0a0a12", border:"1px solid rgba(168,85,247,0.3)", borderRadius:20, padding:24, width:"100%", maxWidth:460, boxShadow:"0 0 60px rgba(168,85,247,0.15)", maxHeight:"90vh", overflowY:"auto" },
+};
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState("dashboard");
+  const [content, setContent] = useState(() => load("adi_content", defaultContent));
+  const [tasks, setTasks] = useState(() => load("adi_tasks", defaultTasks));
+  const [ideas, setIdeas] = useState(() => load("adi_ideas", defaultIdeas));
+  const [analytics, setAnalytics] = useState(() => load("adi_analytics", defaultAnalytics));
+  const [habits, setHabits] = useState(() => load("adi_habits", {}));
+  const [streaks, setStreaks] = useState(() => load("adi_streaks", {}));
+  const [habitGrid, setHabitGrid] = useState(() => load("adi_habitgrid", {}));
+  const [focusMode, setFocusMode] = useState(false);
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(7200);
+  const [motivIdx, setMotivIdx] = useState(() => Math.floor(Math.random() * MOTIVATIONS.length));
+  const [modal, setModal] = useState(null);
+  const [notification, setNotification] = useState(null);
+  const [dragItem, setDragItem] = useState(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => { save("adi_content", content); }, [content]);
+  useEffect(() => { save("adi_tasks", tasks); }, [tasks]);
+  useEffect(() => { save("adi_ideas", ideas); }, [ideas]);
+  useEffect(() => { save("adi_analytics", analytics); }, [analytics]);
+  useEffect(() => { save("adi_habits", habits); }, [habits]);
+  useEffect(() => { save("adi_streaks", streaks); }, [streaks]);
+  useEffect(() => { save("adi_habitgrid", habitGrid); }, [habitGrid]);
+
+  useEffect(() => {
+    const iv = setInterval(() => setMotivIdx(i => (i+1) % MOTIVATIONS.length), 8000);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
+    if (timerActive) {
+      timerRef.current = setInterval(() => {
+        setTimerSeconds(s => {
+          if (s <= 1) { clearInterval(timerRef.current); setTimerActive(false); notify("🔥 Deep work session complete!"); return 7200; }
+          return s - 1;
+        });
+      }, 1000);
+    } else clearInterval(timerRef.current);
+    return () => clearInterval(timerRef.current);
+  }, [timerActive]);
+
+  useEffect(() => {
+    const igReady = content.filter(c => c.platform === "Instagram" && (c.stage === "Ready")).length;
+    if (igReady === 0) setTimeout(() => notify("⚠️ No Instagram reel ready! Prepare content now."), 2000);
+  }, []);
+
+  // Sync mobile nav tab state
+  useEffect(() => {
+    const nav = document.getElementById("mobile-nav");
+    if (!nav) return;
+    const tabs = [
+      { id:"dashboard", icon:"⚡", label:"Home" },
+      { id:"pipeline", icon:"🎬", label:"Pipeline" },
+      { id:"tasks", icon:"✅", label:"Tasks" },
+      { id:"habits", icon:"🔁", label:"Habits" },
+      { id:"ideas", icon:"🧠", label:"Ideas" },
+      { id:"analytics", icon:"📊", label:"Stats" },
+      { id:"calendar", icon:"📅", label:"Calendar" },
+    ];
+    nav.innerHTML = tabs.map(t => `
+      <button class="mob-nav-btn ${tab === t.id ? 'active' : ''}" data-tab="${t.id}" style="color:${tab === t.id ? '#a855f7' : '#555'}">
+        <span>${t.icon}</span>
+        <span style="font-family:'Rajdhani',sans-serif;font-size:9px;letter-spacing:0.5px">${t.label}</span>
+      </button>
+    `).join("");
+    nav.querySelectorAll(".mob-nav-btn").forEach(btn => {
+      btn.addEventListener("click", () => setTab(btn.dataset.tab));
+    });
+  }, [tab]);
+
+  const notify = (msg) => { setNotification(msg); setTimeout(() => setNotification(null), 4000); };
+  const todayKey = new Date().toISOString().split("T")[0];
+  const todayHabits = habits[todayKey] || {};
+  const todayTasks = tasks.filter(t => t.date === todayKey || !t.date);
+  const topTasks = todayTasks.filter(t => !t.done && t.priority === "High").slice(0, 3);
+  const dayProgress = todayTasks.length ? Math.round((todayTasks.filter(t => t.done).length / todayTasks.length) * 100) : 0;
+  const ytPosted = content.filter(c => c.platform === "YouTube" && c.stage === "Posted").length;
+  const igPosted = content.filter(c => c.platform === "Instagram" && c.stage === "Posted").length;
+  const formatTimer = (s) => `${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor((s%3600)/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+
+  const moveContent = (id, newStage) => {
+    setContent(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const p = newStage==="Posted"?100:newStage==="Ready"?90:newStage==="Editing"?65:newStage==="Visuals"?45:newStage==="Script"?25:5;
+      if (newStage === "Posted") {
+        const item = prev.find(x => x.id === id);
+        if (item) setAnalytics(a => a.find(x => x.title === item.title) ? a : [...a, { id:`a${Date.now()}`, title:item.title, platform:item.platform, views:0, likes:0, comments:0, retention:"0%", notes:"" }]);
+        notify("🎉 Content posted! Added to Analytics.");
+      }
+      return { ...c, stage:newStage, progress:p };
+    }));
+  };
+
+  const toggleHabit = (habitId) => {
+    const cur = habits[todayKey] || {};
+    const wasOn = cur[habitId];
+    setHabits(h => ({ ...h, [todayKey]: { ...cur, [habitId]: !wasOn } }));
+    setHabitGrid(g => ({ ...g, [`${todayKey}_${habitId}`]: !wasOn }));
+    if (!wasOn) setStreaks(s => ({ ...s, [habitId]: (s[habitId]||0)+1 }));
+  };
+
+  const addTask = (t) => setTasks(x => [...x, { ...t, id:`t${Date.now()}`, date:todayKey, done:false }]);
+  const toggleTask = (id) => setTasks(t => t.map(x => x.id===id ? {...x, done:!x.done} : x));
+  const deleteTask = (id) => setTasks(t => t.filter(x => x.id!==id));
+  const addContent = (item) => setContent(c => [...c, { ...item, id:`c${Date.now()}`, stage:"Idea", progress:5 }]);
+  const addIdea = (idea) => setIdeas(i => [...i, { ...idea, id:`i${Date.now()}` }]);
+  const deleteIdea = (id) => setIdeas(i => i.filter(x => x.id!==id));
+  const deleteContent = (id) => setContent(c => c.filter(x => x.id!==id));
+
+  const tabs = [
+    { id:"dashboard", label:"Dashboard", icon:"⚡" },
+    { id:"pipeline", label:"Pipeline", icon:"🎬" },
+    { id:"tasks", label:"Tasks", icon:"✅" },
+    { id:"habits", label:"Habits", icon:"🔁" },
+    { id:"ideas", label:"Ideas", icon:"🧠" },
+    { id:"analytics", label:"Analytics", icon:"📊" },
+    { id:"calendar", label:"Calendar", icon:"📅" },
+  ];
+
+  if (focusMode) {
+    const cur = topTasks[0] || todayTasks.find(t => !t.done);
+    return (
+      <div style={{ minHeight:"100vh", background:"#050507", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:28, padding:24, textAlign:"center" }}>
+        <div style={{ fontSize:11, letterSpacing:4, color:"#a855f7", fontWeight:700 }}>FOCUS MODE</div>
+        <div style={{ fontSize:26, fontWeight:800, maxWidth:320, lineHeight:1.3 }}>{cur ? cur.title : "No active task"}</div>
+        <div style={{ fontSize:60, fontWeight:900, letterSpacing:4, color:"#39ff14", textShadow:"0 0 30px #39ff1488", fontVariantNumeric:"tabular-nums" }}>{formatTimer(timerSeconds)}</div>
+        <div style={{ display:"flex", gap:12, flexWrap:"wrap", justifyContent:"center" }}>
+          <button style={S.glowBtn("#39ff14")} onClick={() => setTimerActive(a => !a)}>{timerActive ? "⏸ Pause" : "▶ Start"}</button>
+          <button style={S.glowBtn("#ef4444")} onClick={() => { setTimerActive(false); setTimerSeconds(7200); }}>↺ Reset</button>
+          <button style={S.glowBtn("#a855f7")} onClick={() => setFocusMode(false)}>✕ Exit</button>
+        </div>
+        <div style={{ fontSize:14, color:"#555", fontStyle:"italic", maxWidth:280 }}>"{MOTIVATIONS[motivIdx]}"</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={S.app}>
+      <div style={S.bgGlow} />
+      {notification && (
+        <div style={{ position:"fixed", top:20, right:16, left:16, zIndex:2000, background:"rgba(10,10,20,0.97)", border:"1px solid #a855f7", borderRadius:12, padding:"14px 18px", fontSize:14, fontWeight:600, boxShadow:"0 0 30px rgba(168,85,247,0.3)", maxWidth:360, margin:"0 auto" }}>
+          {notification}
+        </div>
+      )}
+      {modal && <Modal modal={modal} setModal={setModal} addTask={addTask} addContent={addContent} addIdea={addIdea} />}
+
+      <div style={S.layout}>
+        {/* Desktop Sidebar */}
+        <div id="desktop-sidebar" style={S.sidebar}>
+          <div style={{ padding:"20px 16px", borderBottom:"1px solid rgba(168,85,247,0.1)", display:"flex", alignItems:"center", gap:10 }}>
+            <span style={{ fontSize:22 }}>⚔️</span>
+            <span style={{ fontSize:17, fontWeight:900, letterSpacing:2, background:"linear-gradient(135deg,#a855f7,#39ff14)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>ADI OS</span>
+          </div>
+          <nav style={{ flex:1, padding:"8px 0" }}>
+            {tabs.map(t => (
+              <div key={t.id} className="nav-item" onClick={() => setTab(t.id)}
+                style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", margin:"2px 8px", borderRadius:10, cursor:"pointer", transition:"all 0.2s", background:tab===t.id?"rgba(168,85,247,0.15)":"transparent", borderLeft:tab===t.id?"2px solid #a855f7":"2px solid transparent", color:tab===t.id?"#a855f7":"#888", fontWeight:tab===t.id?700:500, fontSize:14 }}>
+                <span style={{ fontSize:18 }}>{t.icon}</span>
+                <span>{t.label}</span>
+              </div>
+            ))}
+          </nav>
+          <div style={{ padding:14, borderTop:"1px solid rgba(168,85,247,0.1)" }}>
+            <button style={{ ...S.glowBtn("#39ff14"), width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }} onClick={() => setFocusMode(true)}>🎯 Focus Mode</button>
+          </div>
+        </div>
+
+        {/* Main */}
+        <main id="main-content" style={S.main}>
+          {tab==="dashboard" && <Dashboard content={content} tasks={tasks} topTasks={topTasks} dayProgress={dayProgress} todayHabits={todayHabits} toggleHabit={toggleHabit} ytPosted={ytPosted} igPosted={igPosted} motivIdx={motivIdx} timerSeconds={timerSeconds} timerActive={timerActive} setTimerActive={setTimerActive} setTimerSeconds={setTimerSeconds} setModal={setModal} setFocusMode={setFocusMode} formatTimer={formatTimer} notify={notify} />}
+          {tab==="pipeline" && <Pipeline content={content} setContent={setContent} moveContent={moveContent} dragItem={dragItem} setDragItem={setDragItem} setModal={setModal} deleteContent={deleteContent} />}
+          {tab==="tasks" && <Tasks tasks={tasks} toggleTask={toggleTask} deleteTask={deleteTask} setModal={setModal} />}
+          {tab==="habits" && <Habits habits={habits} todayHabits={todayHabits} toggleHabit={toggleHabit} streaks={streaks} habitGrid={habitGrid} />}
+          {tab==="ideas" && <Ideas ideas={ideas} deleteIdea={deleteIdea} setModal={setModal} addContent={addContent} notify={notify} />}
+          {tab==="analytics" && <Analytics analytics={analytics} setAnalytics={setAnalytics} />}
+          {tab==="calendar" && <Calendar content={content} tasks={tasks} />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function Dashboard({ content, tasks, topTasks, dayProgress, todayHabits, toggleHabit, ytPosted, igPosted, motivIdx, timerSeconds, timerActive, setTimerActive, setTimerSeconds, setModal, setFocusMode, formatTimer, notify }) {
+  const activeContent = content.find(c => c.stage !== "Posted");
+  const igReady = content.filter(c => c.platform==="Instagram" && c.stage==="Ready").length;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
+        <div>
+          <h1 style={{ fontSize:28, fontWeight:900, margin:0, background:"linear-gradient(135deg,#a855f7,#39ff14)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>ADI OS</h1>
+          <p style={{ margin:0, color:"#555", fontSize:12 }}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
+        </div>
+        {igReady===0 && <div style={{ background:"rgba(239,68,68,0.1)", border:"1px solid #ef444444", borderRadius:10, padding:"6px 12px", color:"#ef4444", fontSize:12, fontWeight:700 }}>⚠️ No IG reel ready!</div>}
+      </div>
+
+      {/* Quick Actions */}
+      <div style={S.card}>
+        <div style={{ fontSize:10, letterSpacing:3, color:"#666", fontWeight:700, marginBottom:12 }}>QUICK ACTIONS</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          {[
+            { label:"+ YouTube Video", color:"#ff4444", action:() => setModal({type:"newContent",platform:"YouTube"}) },
+            { label:"+ Instagram Reel", color:"#39ff14", action:() => setModal({type:"newContent",platform:"Instagram"}) },
+            { label:"+ Add Idea", color:"#a855f7", action:() => setModal({type:"newIdea"}) },
+            { label:"+ Add Task", color:"#f59e0b", action:() => setModal({type:"newTask"}) },
+          ].map(a => (
+            <button key={a.label} className="glow-btn" style={{ ...S.glowBtn(a.color), fontSize:12, padding:"10px 8px", textAlign:"center" }} onClick={a.action}>{a.label}</button>
+          ))}
+        </div>
+        <button className="glow-btn" style={{ ...S.glowBtn("#39ff14"), width:"100%", marginTop:8, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }} onClick={() => setFocusMode(true)}>🎯 Enter Focus Mode</button>
+      </div>
+
+      {/* Today's Focus */}
+      <div style={{ ...S.card, borderColor:"rgba(168,85,247,0.2)" }}>
+        <div style={{ fontSize:10, letterSpacing:3, color:"#a855f7", fontWeight:700, marginBottom:14 }}>TODAY'S FOCUS</div>
+        {activeContent && (
+          <div style={{ marginBottom:14, padding:12, background:"rgba(168,85,247,0.08)", borderRadius:10, border:"1px solid rgba(168,85,247,0.15)" }}>
+            <div style={{ fontSize:11, color:"#666" }}>Active Project</div>
+            <div style={{ fontWeight:700, fontSize:14, margin:"4px 0" }}>{activeContent.title}</div>
+            <div style={{ display:"flex", gap:6 }}>
+              <span style={S.tag(PLATFORM_COLORS[activeContent.platform])}>{activeContent.platform}</span>
+              <span style={S.tag(STAGE_COLORS[activeContent.stage])}>{activeContent.stage}</span>
+            </div>
+          </div>
+        )}
+        <div style={{ fontSize:11, color:"#666", marginBottom:8 }}>Top Priority Tasks</div>
+        {topTasks.length===0 && <div style={{ color:"#555", fontSize:13 }}>All caught up! 🎉</div>}
+        {topTasks.map((t,i) => (
+          <div key={t.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+            <span style={{ color:"#a855f7", fontWeight:700, fontSize:12 }}>{i+1}</span>
+            <span style={{ flex:1, fontSize:13 }}>{t.title}</span>
+            <span style={S.tag("#f59e0b")}>{t.category}</span>
+          </div>
+        ))}
+        <div style={{ marginTop:14 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, marginBottom:5 }}>
+            <span style={{ color:"#666" }}>Day Progress</span>
+            <span style={{ color:"#a855f7", fontWeight:700 }}>{dayProgress}%</span>
+          </div>
+          <div style={S.pBar}><div style={S.pFill(dayProgress,"#a855f7")} /></div>
+        </div>
+      </div>
+
+      {/* Timer + Motivation */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+        <div style={{ ...S.card, textAlign:"center" }}>
+          <div style={{ fontSize:10, letterSpacing:2, color:"#39ff14", fontWeight:700, marginBottom:10 }}>DEEP WORK</div>
+          <div style={{ fontSize:28, fontWeight:900, color:"#39ff14", textShadow:"0 0 20px #39ff1488", fontVariantNumeric:"tabular-nums" }}>{formatTimer(timerSeconds)}</div>
+          <div style={{ display:"flex", gap:6, justifyContent:"center", marginTop:10 }}>
+            <button className="glow-btn" style={{ ...S.glowBtn("#39ff14"), padding:"6px 12px", fontSize:12 }} onClick={() => setTimerActive(a=>!a)}>{timerActive?"⏸":"▶"}</button>
+            <button className="glow-btn" style={{ ...S.glowBtn("#666"), padding:"6px 10px" }} onClick={() => { setTimerActive(false); setTimerSeconds(7200); }}>↺</button>
+          </div>
+        </div>
+        <div style={{ ...S.card, textAlign:"center", display:"flex", flexDirection:"column", justifyContent:"center" }}>
+          <div style={{ fontSize:24, marginBottom:6 }}>⚔️</div>
+          <p style={{ fontSize:12, fontWeight:700, lineHeight:1.4, color:"#e8e8f0", margin:0, fontStyle:"italic" }}>"{MOTIVATIONS[motivIdx]}"</p>
+        </div>
+      </div>
+
+      {/* Weekly Goals */}
+      <div style={S.card}>
+        <div style={{ fontSize:10, letterSpacing:3, color:"#39ff14", fontWeight:700, marginBottom:14 }}>WEEKLY GOALS</div>
+        <div style={{ marginBottom:14 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+            <span style={{ fontSize:13, fontWeight:700 }}>YouTube Videos</span>
+            <span style={{ color:"#ff4444", fontWeight:700 }}>{ytPosted}/2</span>
+          </div>
+          <div style={S.pBar}><div style={S.pFill(Math.min((ytPosted/2)*100,100),"#ff4444")} /></div>
+        </div>
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+            <span style={{ fontSize:13, fontWeight:700 }}>Instagram Reels</span>
+            <span style={{ color:"#39ff14", fontWeight:700 }}>{igPosted}/6</span>
+          </div>
+          <div style={S.pBar}><div style={S.pFill(Math.min((igPosted/6)*100,100),"#39ff14")} /></div>
+        </div>
+      </div>
+
+      {/* Habits */}
+      <div style={S.card}>
+        <div style={{ fontSize:10, letterSpacing:3, color:"#666", fontWeight:700, marginBottom:12 }}>TODAY'S HABITS</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          {HABITS.map(h => {
+            const done = todayHabits[h.id];
+            return (
+              <div key={h.id} className="habit-card" onClick={() => toggleHabit(h.id)}
+                style={{ padding:12, borderRadius:12, cursor:"pointer", textAlign:"center", border:`1px solid ${done?"#39ff1444":"rgba(255,255,255,0.06)"}`, background:done?"rgba(57,255,20,0.08)":"rgba(255,255,255,0.02)", transition:"all 0.2s" }}>
+                <div style={{ fontSize:22, marginBottom:4 }}>{h.icon}</div>
+                <div style={{ fontSize:11, fontWeight:700, color:done?"#39ff14":"#666" }}>{h.label}</div>
+                {done && <div style={{ fontSize:10, color:"#39ff14", marginTop:2 }}>✓ Done</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PIPELINE ─────────────────────────────────────────────────────────────────
+function Pipeline({ content, setContent, moveContent, dragItem, setDragItem, setModal, deleteContent }) {
+  const [selected, setSelected] = useState(null);
+  const onDragStart = (e, item) => { setDragItem(item); };
+  const onDrop = (e, stage) => { e.preventDefault(); if (dragItem) { moveContent(dragItem.id, stage); setDragItem(null); } };
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
+        <h2 style={{ margin:0, fontSize:22, fontWeight:800 }}>Pipeline</h2>
+        <button className="glow-btn" style={S.glowBtn("#a855f7")} onClick={() => setModal({type:"newContent"})}>+ New</button>
+      </div>
+      {selected && (
+        <div style={{ ...S.card, borderColor:"rgba(168,85,247,0.3)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <h3 style={{ margin:0, fontSize:15, fontWeight:800, color:"#a855f7", flex:1, marginRight:8 }}>{selected.title}</h3>
+            <div style={{ display:"flex", gap:6 }}>
+              <button className="glow-btn" style={{ ...S.glowBtn("#ef4444"), padding:"6px 10px", fontSize:12 }} onClick={() => { deleteContent(selected.id); setSelected(null); }}>Delete</button>
+              <button className="glow-btn" style={{ ...S.glowBtn("#666"), padding:"6px 10px" }} onClick={() => setSelected(null)}>✕</button>
+            </div>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <select style={S.input} value={selected.stage} onChange={e => { moveContent(selected.id, e.target.value); setSelected({...selected, stage:e.target.value}); }}>
+              {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <input style={S.input} placeholder="Notes / hook..." defaultValue={selected.notes} onBlur={e => setContent(c => c.map(x => x.id===selected.id ? {...x,notes:e.target.value} : x))} />
+          </div>
+        </div>
+      )}
+      <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:8 }}>
+        {STAGES.map(stage => {
+          const items = content.filter(c => c.stage===stage);
+          return (
+            <div key={stage} onDragOver={e => e.preventDefault()} onDrop={e => onDrop(e,stage)}
+              style={{ minWidth:180, flex:"0 0 180px", background:"rgba(10,10,18,0.8)", border:`1px solid ${STAGE_COLORS[stage]}22`, borderRadius:14, padding:12 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
+                <div style={{ width:7, height:7, borderRadius:"50%", background:STAGE_COLORS[stage], boxShadow:`0 0 6px ${STAGE_COLORS[stage]}` }} />
+                <span style={{ fontWeight:800, fontSize:11, letterSpacing:1, color:STAGE_COLORS[stage] }}>{stage.toUpperCase()}</span>
+                <span style={{ marginLeft:"auto", fontSize:11, color:"#555" }}>{items.length}</span>
+              </div>
+              {items.map(item => (
+                <div key={item.id} draggable onDragStart={e => onDragStart(e,item)} onClick={() => setSelected(item)} className="pipeline-card"
+                  style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:10, padding:10, marginBottom:8, cursor:"grab" }}>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:5, lineHeight:1.3 }}>{item.title}</div>
+                  <div style={{ display:"flex", gap:4, marginBottom:6, flexWrap:"wrap" }}>
+                    <span style={S.tag(PLATFORM_COLORS[item.platform])}>{item.platform}</span>
+                    {item.priority==="High" && <span style={S.tag("#ef4444")}>🔥</span>}
+                  </div>
+                  <div style={{ fontSize:10, color:"#555", marginBottom:5 }}>📅 {item.deadline||"No date"}</div>
+                  <div style={S.pBar}><div style={S.pFill(item.progress, STAGE_COLORS[stage])} /></div>
+                  <div style={{ fontSize:10, color:"#555", marginTop:3 }}>{item.progress}%</div>
+                </div>
+              ))}
+              {items.length===0 && <div style={{ color:"#333", fontSize:11, textAlign:"center", padding:"16px 0" }}>Drop here</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── TASKS ────────────────────────────────────────────────────────────────────
+function Tasks({ tasks, toggleTask, deleteTask, setModal }) {
+  const [filter, setFilter] = useState("All");
+  const filtered = filter==="All" ? tasks : tasks.filter(t => t.category===filter);
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <h2 style={{ margin:0, fontSize:22, fontWeight:800 }}>Tasks</h2>
+        <button className="glow-btn" style={S.glowBtn("#f59e0b")} onClick={() => setModal({type:"newTask"})}>+ Add</button>
+      </div>
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+        {["All",...TASK_CATEGORIES].map(c => (
+          <button key={c} className="glow-btn" style={{ ...S.glowBtn(filter===c?"#a855f7":"#444"), padding:"6px 12px", fontSize:11 }} onClick={() => setFilter(c)}>{c}</button>
+        ))}
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {filtered.length===0 && <div style={{ ...S.card, textAlign:"center", color:"#555" }}>No tasks. Add one!</div>}
+        {filtered.map(task => (
+          <div key={task.id} className="task-item" style={{ ...S.card, display:"flex", alignItems:"center", gap:12, padding:"12px 16px", opacity:task.done?0.5:1 }}>
+            <div onClick={() => toggleTask(task.id)} style={{ width:22, height:22, border:`2px solid ${task.done?"#39ff14":"#333"}`, borderRadius:6, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", background:task.done?"rgba(57,255,20,0.15)":"transparent", flexShrink:0, transition:"all 0.2s" }}>
+              {task.done && <span style={{ color:"#39ff14", fontSize:14 }}>✓</span>}
+            </div>
+            <span style={{ flex:1, fontSize:14, fontWeight:600, textDecoration:task.done?"line-through":"none", color:task.done?"#555":"#e8e8f0" }}>{task.title}</span>
+            <span style={S.tag({High:"#ef4444",Medium:"#f59e0b",Low:"#39ff14"}[task.priority]||"#666")}>{task.priority}</span>
+            <button onClick={() => deleteTask(task.id)} style={{ background:"none", border:"none", color:"#444", cursor:"pointer", fontSize:16 }}>✕</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── HABITS ───────────────────────────────────────────────────────────────────
+function Habits({ habits, todayHabits, toggleHabit, streaks, habitGrid }) {
+  const last21 = Array.from({length:21},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(20-i)); return d.toISOString().split("T")[0]; });
+  const weekScore = () => {
+    let total=0,done=0;
+    for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);const k=d.toISOString().split("T")[0];const dh=habits[k]||{};total+=HABITS.length;done+=HABITS.filter(h=>dh[h.id]).length;}
+    return total?Math.round((done/total)*100):0;
+  };
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <h2 style={{ margin:0, fontSize:22, fontWeight:800 }}>Habits</h2>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+        {HABITS.map(h => {
+          const done = todayHabits[h.id];
+          const streak = streaks[h.id]||0;
+          return (
+            <div key={h.id} className="habit-big" onClick={() => toggleHabit(h.id)}
+              style={{ ...S.card, cursor:"pointer", textAlign:"center", border:`1px solid ${done?"#39ff1433":"rgba(255,255,255,0.06)"}`, background:done?"rgba(57,255,20,0.05)":"rgba(10,10,18,0.9)" }}>
+              <div style={{ fontSize:30, marginBottom:6 }}>{h.icon}</div>
+              <div style={{ fontWeight:800, fontSize:13, marginBottom:3 }}>{h.label}</div>
+              <div style={{ fontSize:11, color:done?"#39ff14":"#555" }}>{done?"✓ Done":"Tap to complete"}</div>
+              <div style={{ marginTop:10, fontSize:22, fontWeight:900, color:"#a855f7" }}>{streak}</div>
+              <div style={{ fontSize:10, color:"#555" }}>day streak</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={S.card}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+          <div style={{ fontSize:10, letterSpacing:3, color:"#a855f7", fontWeight:700 }}>WEEKLY SCORE</div>
+          <div style={{ fontSize:22, fontWeight:900, color:"#39ff14" }}>{weekScore()}%</div>
+        </div>
+        <div style={S.pBar}><div style={S.pFill(weekScore(),"#39ff14")} /></div>
+      </div>
+      <div style={S.card}>
+        <div style={{ fontSize:10, letterSpacing:3, color:"#666", fontWeight:700, marginBottom:12 }}>21-DAY ACTIVITY</div>
+        {HABITS.map(h => (
+          <div key={h.id} style={{ marginBottom:10 }}>
+            <div style={{ fontSize:11, color:"#666", marginBottom:5 }}>{h.icon} {h.label}</div>
+            <div style={{ display:"flex", gap:3 }}>
+              {last21.map(day => {
+                const active = habitGrid[`${day}_${h.id}`];
+                return <div key={day} title={day} style={{ width:14, height:14, borderRadius:3, background:active?"#39ff14":"rgba(255,255,255,0.05)", boxShadow:active?"0 0 4px #39ff1488":"none", transition:"all 0.2s" }} />;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── IDEAS ────────────────────────────────────────────────────────────────────
+function Ideas({ ideas, deleteIdea, setModal, addContent, notify }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+  const filtered = ideas.filter(i => (filter==="All"||i.platform===filter) && (i.title.toLowerCase().includes(search.toLowerCase())||i.hook.toLowerCase().includes(search.toLowerCase())));
+  const promote = (idea) => { addContent({title:idea.title,platform:idea.platform,timeRequired:"TBD",deadline:"",notes:idea.hook,priority:"Medium"}); notify("✅ Idea moved to Pipeline!"); };
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <h2 style={{ margin:0, fontSize:22, fontWeight:800 }}>Ideas</h2>
+        <button className="glow-btn" style={S.glowBtn("#a855f7")} onClick={() => setModal({type:"newIdea"})}>⚡ Capture</button>
+      </div>
+      <input style={S.input} placeholder="Search ideas..." value={search} onChange={e => setSearch(e.target.value)} />
+      <div style={{ display:"flex", gap:6 }}>
+        {["All","YouTube","Instagram"].map(p => (
+          <button key={p} className="glow-btn" style={{ ...S.glowBtn(filter===p?"#a855f7":"#444"), padding:"6px 12px", fontSize:11 }} onClick={() => setFilter(p)}>{p}</button>
+        ))}
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {filtered.map(idea => (
+          <div key={idea.id} className="idea-card" style={S.card}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <span style={S.tag(PLATFORM_COLORS[idea.platform])}>{idea.platform}</span>
+              <span>{"⭐".repeat(idea.viral)}</span>
+            </div>
+            <div style={{ fontWeight:800, fontSize:15, marginBottom:5 }}>{idea.title}</div>
+            <div style={{ fontSize:13, color:"#888", marginBottom:12, fontStyle:"italic" }}>"{idea.hook}"</div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button className="glow-btn" style={{ ...S.glowBtn("#39ff14"), flex:1, fontSize:12 }} onClick={() => promote(idea)}>→ Pipeline</button>
+              <button className="glow-btn" style={{ ...S.glowBtn("#ef4444"), padding:"8px 12px" }} onClick={() => deleteIdea(idea.id)}>✕</button>
+            </div>
+          </div>
+        ))}
+        {filtered.length===0 && <div style={{ ...S.card, textAlign:"center", color:"#555" }}>No ideas yet. Capture one!</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── ANALYTICS ────────────────────────────────────────────────────────────────
+function Analytics({ analytics, setAnalytics }) {
+  const upd = (id,f,v) => setAnalytics(a => a.map(x => x.id===id ? {...x,[f]:isNaN(Number(v))?v:Number(v)} : x));
+  const top = [...analytics].sort((a,b) => b.views-a.views)[0];
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <h2 style={{ margin:0, fontSize:22, fontWeight:800 }}>Analytics</h2>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+        {[
+          { label:"Total Views", value:analytics.reduce((s,a)=>s+(a.views||0),0).toLocaleString(), color:"#a855f7" },
+          { label:"Total Likes", value:analytics.reduce((s,a)=>s+(a.likes||0),0).toLocaleString(), color:"#39ff14" },
+          { label:"Content", value:analytics.length, color:"#f59e0b" },
+          { label:"Top: "+((top?.title||"—").slice(0,12)+"…"), value:"🏆", color:"#ef4444" },
+        ].map(s => (
+          <div key={s.label} style={{ ...S.card, textAlign:"center" }}>
+            <div style={{ fontSize:24, fontWeight:900, color:s.color, textShadow:`0 0 15px ${s.color}44` }}>{s.value}</div>
+            <div style={{ fontSize:11, color:"#555", marginTop:4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+      {analytics.map(item => (
+        <div key={item.id} style={{ ...S.card }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+            <div style={{ fontWeight:700, fontSize:13, flex:1, marginRight:8 }}>{item.title}</div>
+            <span style={S.tag(PLATFORM_COLORS[item.platform])}>{item.platform}</span>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:8 }}>
+            {["views","likes","comments"].map(f => (
+              <div key={f}>
+                <div style={{ fontSize:10, color:"#555", marginBottom:3 }}>{f.toUpperCase()}</div>
+                <input style={{ ...S.input, padding:"6px 8px", fontSize:13 }} value={item[f]} onChange={e => upd(item.id,f,e.target.value)} />
+              </div>
+            ))}
+          </div>
+          <input style={{ ...S.input, padding:"6px 10px", fontSize:12 }} placeholder="Notes (what worked/failed)" value={item.notes} onChange={e => upd(item.id,"notes",e.target.value)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── CALENDAR ─────────────────────────────────────────────────────────────────
+function Calendar({ content, tasks }) {
+  const today = new Date();
+  const [month, setMonth] = useState(today.getMonth());
+  const [year, setYear] = useState(today.getFullYear());
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const getEvents = (day) => {
+    const date = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    return { c:content.filter(x => x.deadline===date), t:tasks.filter(x => x.date===date) };
+  };
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <h2 style={{ margin:0, fontSize:22, fontWeight:800 }}>Calendar</h2>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <button className="glow-btn" style={{ ...S.glowBtn("#666"), padding:"6px 10px" }} onClick={() => { if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1); }}>‹</button>
+          <span style={{ fontSize:13, fontWeight:700 }}>{new Date(year,month).toLocaleDateString("en-US",{month:"short",year:"numeric"})}</span>
+          <button className="glow-btn" style={{ ...S.glowBtn("#666"), padding:"6px 10px" }} onClick={() => { if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1); }}>›</button>
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:10, fontSize:11 }}>
+        <span>🔴 YouTube</span><span>🟢 Instagram</span><span>🟣 Task</span>
+      </div>
+      <div style={S.card}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2, marginBottom:6 }}>
+          {["S","M","T","W","T","F","S"].map((d,i) => <div key={i} style={{ textAlign:"center", fontSize:10, color:"#555", fontWeight:700, padding:"4px 0" }}>{d}</div>)}
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
+          {Array.from({length:firstDay},(_,i) => <div key={`e${i}`} />)}
+          {Array.from({length:daysInMonth},(_,i) => {
+            const day=i+1;
+            const isToday=day===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
+            const {c,t}=getEvents(day);
+            return (
+              <div key={day} style={{ minHeight:52, padding:4, borderRadius:6, background:isToday?"rgba(168,85,247,0.1)":"rgba(255,255,255,0.02)", border:`1px solid ${isToday?"rgba(168,85,247,0.4)":"rgba(255,255,255,0.03)"}` }}>
+                <div style={{ fontSize:11, fontWeight:isToday?900:500, color:isToday?"#a855f7":"#666", marginBottom:2 }}>{day}</div>
+                {c.slice(0,2).map(x => <div key={x.id} style={{ fontSize:9, padding:"1px 3px", borderRadius:2, background:`${PLATFORM_COLORS[x.platform]}22`, color:PLATFORM_COLORS[x.platform], marginBottom:1, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{x.title.slice(0,8)}</div>)}
+                {t.slice(0,1).map(x => <div key={x.id} style={{ fontSize:9, padding:"1px 3px", borderRadius:2, background:"rgba(168,85,247,0.15)", color:"#a855f7", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{x.title.slice(0,8)}</div>)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function Modal({ modal, setModal, addTask, addContent, addIdea }) {
+  const [form, setForm] = useState({ title:"", platform:modal.platform||"YouTube", timeRequired:"", deadline:"", notes:"", priority:"Medium", category:"Deep Work", hook:"", viral:3 });
+  const f = (k,v) => setForm(x => ({...x,[k]:v}));
+  const submit = () => {
+    if (!form.title.trim()) return;
+    if (modal.type==="newTask") addTask({title:form.title, category:form.category, priority:form.priority});
+    else if (modal.type==="newContent") addContent({title:form.title, platform:form.platform, timeRequired:form.timeRequired, deadline:form.deadline, notes:form.notes, priority:form.priority});
+    else if (modal.type==="newIdea") addIdea({title:form.title, platform:form.platform, hook:form.hook, viral:form.viral});
+    setModal(null);
+  };
+  const titles = { newTask:"New Task", newContent:"New Content", newIdea:"Capture Idea" };
+  return (
+    <div style={S.modalOverlay} onClick={() => setModal(null)}>
+      <div style={S.modalBox} onClick={e => e.stopPropagation()}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <h3 style={{ margin:0, fontSize:18, fontWeight:800, color:"#a855f7" }}>{titles[modal.type]}</h3>
+          <button onClick={() => setModal(null)} style={{ background:"none", border:"none", color:"#555", cursor:"pointer", fontSize:20 }}>✕</button>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <div>
+            <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>TITLE *</label>
+            <input style={S.input} placeholder="Enter title..." value={form.title} onChange={e => f("title",e.target.value)} autoFocus />
+          </div>
+          {modal.type!=="newTask" && (
+            <div>
+              <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>PLATFORM</label>
+              <select style={S.input} value={form.platform} onChange={e => f("platform",e.target.value)}>
+                {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          )}
+          {modal.type==="newTask" && (
+            <>
+              <div>
+                <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>CATEGORY</label>
+                <select style={S.input} value={form.category} onChange={e => f("category",e.target.value)}>
+                  {TASK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>PRIORITY</label>
+                <select style={S.input} value={form.priority} onChange={e => f("priority",e.target.value)}>
+                  {PRIORITY_LEVELS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </>
+          )}
+          {modal.type==="newContent" && (
+            <>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div>
+                  <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>TIME</label>
+                  <input style={S.input} placeholder="e.g. 8h" value={form.timeRequired} onChange={e => f("timeRequired",e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>DEADLINE</label>
+                  <input type="date" style={S.input} value={form.deadline} onChange={e => f("deadline",e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>NOTES</label>
+                <textarea style={{ ...S.input, height:60, resize:"vertical" }} value={form.notes} onChange={e => f("notes",e.target.value)} />
+              </div>
+            </>
+          )}
+          {modal.type==="newIdea" && (
+            <>
+              <div>
+                <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>HOOK</label>
+                <input style={S.input} placeholder="What's the hook?" value={form.hook} onChange={e => f("hook",e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize:11, color:"#666", letterSpacing:1, display:"block", marginBottom:5 }}>VIRAL POTENTIAL</label>
+                <input type="range" min={1} max={5} value={form.viral} onChange={e => f("viral",Number(e.target.value))} style={{ width:"100%" }} />
+                <div style={{ textAlign:"center", color:"#a855f7", fontWeight:800, fontSize:16, marginTop:4 }}>{"⭐".repeat(form.viral)}</div>
+              </div>
+            </>
+          )}
+        </div>
+        <div style={{ display:"flex", gap:8, marginTop:20 }}>
+          <button className="glow-btn" style={{ ...S.glowBtn("#a855f7"), flex:1 }} onClick={submit}>Save</button>
+          <button className="glow-btn" style={S.glowBtn("#444")} onClick={() => setModal(null)}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MOUNT ────────────────────────────────────────────────────────────────────
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+
+<script>
+// ─── SERVICE WORKER ───────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      console.log('SW registered:', reg.scope);
+    }).catch(err => console.log('SW failed:', err));
+  });
+}
+
+// ─── PWA INSTALL PROMPT ───────────────────────────────────────────────────────
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const banner = document.getElementById('install-banner');
+  if (banner) banner.classList.remove('hide');
+});
+
+document.getElementById('install-btn')?.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('install-banner').classList.add('hide');
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner')?.classList.add('hide');
+});
+
+// ─── SPLASH SCREEN ────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    if (splash) {
+      splash.classList.add('hide');
+      setTimeout(() => splash.remove(), 500);
+    }
+  }, 1800);
+});
+</script>
+</body>
+</html>
